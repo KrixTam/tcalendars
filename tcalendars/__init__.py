@@ -31,9 +31,9 @@ class TransactionCalendars(metaclass=Singleton):
         get_calendar(dir=CWD)
         self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
 
-    def is_trade_date(self, dt):
+    def is_trading_day(self, dt):
         try:
-            res = self._se_calendar.loc[self._se_calendar['jyrq'] == dt].iloc[0]['jybz'] == 1
+            res = bool(self._se_calendar.loc[self._se_calendar['jyrq'] == dt].iloc[0]['jybz'] == 1)
         except IndexError:
             res = False
         return res

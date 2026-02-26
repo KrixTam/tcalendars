@@ -13,9 +13,9 @@ class TestTransactionCalendars(unittest.TestCase):
         dis_filename = get_filename(path.dirname(CWD))
         shutil.copy(src_filename, dis_filename)
         tc = TransactionCalendars()
-        self.assertFalse(tc.is_trade_date('2024-11-24'))
-        self.assertTrue(tc.is_trade_date('2024-11-28'))
-        self.assertFalse(tc.is_trade_date('2224-11-24'))
+        self.assertFalse(tc.is_trading_day('2024-11-24'))
+        self.assertTrue(tc.is_trading_day('2024-11-28'))
+        self.assertFalse(tc.is_trading_day('2224-11-24'))
 
 
 if __name__ == '__main__':
