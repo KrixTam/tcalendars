@@ -8,7 +8,10 @@ from os import path
 SZSE_URL = 'http://www.szse.cn/api/report/exchange/onepersistenthour/monthList'
 
 
-def get_dates_by_month(date):
+def get_dates_by_month(date: str):
+    '''
+    获取date所在月的交易日数据
+    '''
     params = {
         'month': moment(date).format('YYYY-MM'),
         'random': random.random(),
@@ -18,7 +21,10 @@ def get_dates_by_month(date):
     return response.json()['data']
 
 
-def get_filename(dir=None):
+def get_filename(dir: str = None):
+    '''
+    获取交易日历文件名
+    '''
     output_filename = 'se_calendar.csv'
     if dir is None:
         dir_name = path.dirname(path.dirname(__file__))
@@ -27,15 +33,14 @@ def get_filename(dir=None):
     return path.join(dir_name, output_filename)
 
 
-def get_calendar(start_date='2005-1-1', end_date=None, dir=None):
+def get_calendar(start_date: str = '2005-1-1', end_date: str = None, dir: str = None):
     '''
     zrxh：weekday，1（星期天） - 7（星期六）
     jybz：1 - 交易日；0 - 非交易日
     jyrq：交易日期
-    :return:
     '''
     print('获取A股交易日历中，请稍等……')
-    dt = moment(start_date)
+    dt = moment(moment(start_date).format('YYYY-MM-01'))
     if end_date is None:
         now = moment(moment().format('YYYY-12-31'))
     else:
@@ -49,7 +54,7 @@ def get_calendar(start_date='2005-1-1', end_date=None, dir=None):
             w.writerow(d)
         dt.add(1, 'months', inplace=True)
         count = 0
-        while dt < now:
+        while dt <= now:
             for d in get_dates_by_month(dt):
                 w.writerow(d)
             count = count + 1

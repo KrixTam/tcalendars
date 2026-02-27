@@ -1,6 +1,6 @@
 [project]
 name = "tcalendars"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
   { name="Krix Tam", email="krix.tam@qq.com" },
 ]

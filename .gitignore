@@ -10,3 +10,4 @@ htmlcov
 dist
 tcalendars.egg-info
 .pypirc
+.vscode
