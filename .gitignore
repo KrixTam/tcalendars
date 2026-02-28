@@ -11,3 +11,4 @@ dist
 tcalendars.egg-info
 .pypirc
 .vscode
+.yfinance_cache

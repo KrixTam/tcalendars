@@ -5,6 +5,7 @@ from moment import moment
 from datetime import datetime
 import akshare as ak
 from tcalendars.tools.get_se_calendar import get_calendar_filename, get_calendar
+from tcalendars.tools.yfinance_query import search_yahoo_finance
 CWD = path.abspath(path.dirname(__file__))
 SE_DTYPE = {'zrxh': np.int8, 'jybz': np.int8, 'jyrq': str}
 
@@ -146,4 +147,20 @@ class StockNameCodeHelper(metaclass=Singleton):
             res = self._stock_name_code.loc[self._stock_name_code['name'] == name].iloc[0]['code']
         except IndexError:
             res = None
+        return res
+    
+    @staticmethod
+    def get_stock_code_by_english_name(name: str):
+        '''
+        获取股票英文名称对应的股票代码
+        '''
+        response = search_yahoo_finance(name)
+        if response:
+            # print(response)
+            quotes = response.get('quotes', [])
+            res = quotes[0].get('symbol', None) if quotes else None
+        else:
+            res = None
+        if res:
+            res = res.split('.')[0]
         return res

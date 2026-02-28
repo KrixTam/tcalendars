@@ -37,4 +37,8 @@ helper.get_stock_name('000001')
 # 根据股票名称获取股票代码
 helper.get_stock_code('平安银行')
 # 输出：'000001'
+
+# 根据股票英文名称获取股票代码
+StockNameCodeHelper.get_stock_code_by_english_name('PONY AI')
+# 输出：'PONY'
 ```

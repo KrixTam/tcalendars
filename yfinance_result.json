@@ -1,0 +1,43 @@
+{
+  "explains": [],
+  "count": 2,
+  "quotes": [
+    {
+      "exchange": "SHH",
+      "shortname": "CHENGTUN MINING GROUP CO. LTD",
+      "quoteType": "EQUITY",
+      "symbol": "600711.SS",
+      "index": "quotes",
+      "score": 20001.0,
+      "typeDisp": "股票",
+      "longname": "盛屯礦業",
+      "exchDisp": "上海",
+      "sector": "Basic Materials",
+      "sectorDisp": "基本材料",
+      "industry": "Other Industrial Metals & Mining",
+      "industryDisp": "其他工業金屬和採礦",
+      "isYahooFinance": true
+    }
+  ],
+  "news": [],
+  "nav": [
+    {
+      "navName": "Other Industrial Metals & Mining",
+      "navUrl": "https://finance.yahoo.com/sectors/basic-materials/other-industrial-metals-mining"
+    }
+  ],
+  "lists": [],
+  "researchReports": [],
+  "screenerFieldResults": [],
+  "totalTime": 67,
+  "timeTakenForQuotes": 425,
+  "timeTakenForNews": 900,
+  "timeTakenForAlgowatchlist": 0,
+  "timeTakenForPredefinedScreener": 0,
+  "timeTakenForCrunchbase": 0,
+  "timeTakenForNav": 400,
+  "timeTakenForResearchReports": 800,
+  "timeTakenForScreenerField": 0,
+  "timeTakenForCulturalAssets": 750,
+  "timeTakenForSearchLists": 0
+}
