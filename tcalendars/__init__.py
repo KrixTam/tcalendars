@@ -19,28 +19,24 @@ class Singleton(type):
 class TradingCalendars(metaclass=Singleton):
     def __init__(self):
         self._se_calendars_filename = get_filename(CWD)
+        self.update_calendar()
+
+    def update_calendar(self):
+        '''
+        更新交易日历
+        '''
+        # 更新新增的交易日历
         if path.exists(self._se_calendars_filename):
             self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
             now = moment().format('YYYY-MM-DD')
             latest_date = self._se_calendar['jyrq'].max()
             if latest_date < now:
-                self.update_calendar(latest_date, now)
-        else:
-            self.init_calendar()  # pragma: no cover
-
-    def init_calendar(self):
-        '''
-        初始化交易日历
-        '''
-        get_calendar(dir=CWD)
-        self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
-
-    def update_calendar(self, start: str, end: str):
-        '''
-        更新start到end之间的交易日历
-        '''
-        get_calendar(start, end, CWD)
-        self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
+                get_calendar(latest_date, now, CWD)
+                self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
+        # 初始化下载交易日历
+        else:  # pragma: no cover
+            get_calendar(dir=CWD)
+            self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
 
     def is_trading_day(self, dt):
         '''
