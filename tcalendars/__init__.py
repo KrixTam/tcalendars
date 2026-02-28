@@ -155,12 +155,13 @@ class StockNameCodeHelper(metaclass=Singleton):
         获取股票英文名称对应的股票代码
         '''
         response = search_yahoo_finance(name)
+        # print(response)
         if response:
-            # print(response)
             quotes = response.get('quotes', [])
             res = quotes[0].get('symbol', None) if quotes else None
+            if res is None:
+                if "(" in name and ")" in name:
+                    res = StockNameCodeHelper.get_stock_code_by_english_name(name.split("(")[0].strip())
         else:
             res = None
-        if res:
-            res = res.split('.')[0]
         return res
