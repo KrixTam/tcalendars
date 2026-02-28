@@ -26,7 +26,8 @@ for d in dirs:
 
 test_modules = [
     'tcalendars.test.test_tools',
-    'tcalendars.test.test_transactioncalendars'
+    'tcalendars.test.test_tradingcalendars',
+    'tcalendars.test.test_stocknamecodehelper',
 ]
 
 # 执行测试用例

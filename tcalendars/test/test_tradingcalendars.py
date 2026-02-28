@@ -2,7 +2,7 @@ import unittest
 from os import path
 import shutil
 from tcalendars import TradingCalendars
-from tcalendars.tools.get_se_calendar import get_filename
+from tcalendars.tools.get_se_calendar import get_calendar_filename
 
 CWD = path.abspath(path.dirname(__file__))
 
@@ -10,7 +10,7 @@ CWD = path.abspath(path.dirname(__file__))
 class TestTradingCalendars(unittest.TestCase):
     def test_normal(self):
         src_filename = path.join(CWD, 'calendar.csv')
-        dis_filename = get_filename(path.dirname(CWD))
+        dis_filename = get_calendar_filename(path.dirname(CWD))
         shutil.copy(src_filename, dis_filename)
         tc = TradingCalendars()
         self.assertFalse(tc.is_trading_day('2024-11-24'))

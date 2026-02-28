@@ -25,4 +25,16 @@ calendar.get_trading_days('2023-01-01', '2023-01-05')
 # 获取2023年1月1日所在的交易日，如果1月1日不是交易日，则返回后一个交易日
 calendar.get_trading_day('2023-01-01')
 # 输出：'2023-01-03'
+
+from tcalendars import StockNameCodeHelper
+
+helper = StockNameCodeHelper()
+
+# 根据股票代码获取股票名称
+helper.get_stock_name('000001')
+# 输出：'平安银行'
+
+# 根据股票名称获取股票代码
+helper.get_stock_code('平安银行')
+# 输出：'000001'
 ```

@@ -21,7 +21,7 @@ def get_dates_by_month(date: str):
     return response.json()['data']
 
 
-def get_filename(dir: str = None):
+def get_calendar_filename(dir: str = None):
     '''
     获取交易日历文件名
     '''
@@ -33,7 +33,7 @@ def get_filename(dir: str = None):
     return path.join(dir_name, output_filename)
 
 
-def get_calendar(start_date: str = '2005-1-1', end_date: str = None, dir: str = None):
+def get_calendar(start_date: str = '2005-01-01', end_date: str = None, dir: str = None):
     '''
     zrxh：weekday，1（星期天） - 7（星期六）
     jybz：1 - 交易日；0 - 非交易日
@@ -45,7 +45,7 @@ def get_calendar(start_date: str = '2005-1-1', end_date: str = None, dir: str = 
         now = moment(moment().format('YYYY-12-31'))
     else:
         now = moment(end_date)
-    with open(get_filename(dir), 'w') as fd:
+    with open(get_calendar_filename(dir), 'w') as fd:
         w = None
         for d in get_dates_by_month(dt):
             if w is None:
