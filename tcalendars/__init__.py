@@ -154,11 +154,23 @@ class StockNameCodeHelper(metaclass=Singleton):
         '''
         获取股票英文名称对应的股票代码
         '''
+        response = StockNameCodeHelper.get_stock_info_by_english_name(name)
+        if response:
+            res = response.get('symbol', None)
+        else:
+            res = None
+        return res
+
+    @staticmethod
+    def get_stock_info_by_english_name(name: str):
+        '''
+        获取股票英文名称对应的股票名称和股票代码等信息
+        '''
         response = search_yahoo_finance(name)
         # print(response)
         if response:
             quotes = response.get('quotes', [])
-            res = quotes[0].get('symbol', None) if quotes else None
+            res = quotes[0] if quotes else None
             if res is None:
                 if "(" in name and ")" in name:
                     res = StockNameCodeHelper.get_stock_code_by_english_name(name.split("(")[0].strip())
