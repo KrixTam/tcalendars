@@ -12,6 +12,12 @@ playwright install chromium
 pip install tcalendars
 ```
 
+## 缓存
+
+- `StockNameCodeHelper.get_stock_code_by_english_name` / `StockNameCodeHelper.get_stock_info_by_english_name` 会通过 Playwright 调用 Yahoo Finance 搜索接口
+- 查询结果会写入当前工作目录下的 `.yfinance_cache` 作为本地缓存，并在启动时自动加载
+- 超过 60 天的本地缓存不会加载到内存（删除 `.yfinance_cache` 可重建缓存）
+
 ## 示例
 
 **代码示例**

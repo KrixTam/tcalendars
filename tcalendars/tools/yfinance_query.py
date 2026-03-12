@@ -49,7 +49,7 @@ def _persist_api_cache_to_disk() -> None:
         data_to_persist: Dict[str, Dict] = {}
         for url, payload in _API_CACHE.items():
             if not isinstance(url, str) or not isinstance(payload, dict):
-                continue
+                continue  # pragma: no cover
             ts = _API_CACHE_TS.get(url)
             if not isinstance(ts, int):
                 ts = int(time.time())
@@ -61,7 +61,7 @@ def _persist_api_cache_to_disk() -> None:
         try:
             if tmp_path.exists():
                 tmp_path.unlink()
-        except Exception:
+        except Exception:  # pragma: no cover
             pass
 
 

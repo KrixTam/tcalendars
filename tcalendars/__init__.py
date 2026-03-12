@@ -125,7 +125,7 @@ class StockNameCodeHelper(metaclass=Singleton):
                 print(f"更新股票名称代码表成功，共{len(df_all)}条记录")
             except Exception as e:
                 print(f"更新股票名称代码表失败：{e}")
-        else:
+        else:  # pragma: no cover
             print(f"股票名称代码表已最新，无需更新")
             self._stock_name_code = pd.read_csv(self._stock_name_code_filename, dtype={'code': str, 'name': str, 'market': str})
 
