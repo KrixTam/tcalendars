@@ -1,9 +1,71 @@
 from playwright.sync_api import sync_playwright
 from typing import Optional, Dict
 import urllib.parse
+import json
+import os
+import time
+from pathlib import Path
 
 # 全局内存缓存，用于存储请求结果
 _API_CACHE: Dict[str, Dict] = {}
+_API_CACHE_TS: Dict[str, int] = {}
+_CACHE_FILE = Path(".yfinance_cache")
+_CACHE_MAX_AGE_SECONDS = 60 * 24 * 60 * 60
+
+
+def _load_api_cache_from_disk() -> None:
+    if not _CACHE_FILE.is_file():
+        return
+    try:
+        data = json.loads(_CACHE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    if not isinstance(data, dict):
+        return
+    now = int(time.time())
+    for key, value in data.items():
+        if not isinstance(key, str):
+            continue
+        if not isinstance(value, dict):
+            continue
+
+        ts = value.get("ts")
+        cached_data = value.get("data")
+
+        if isinstance(cached_data, dict) and isinstance(ts, (int, float)):
+            ts_int = int(ts)
+            if now - ts_int <= _CACHE_MAX_AGE_SECONDS:
+                _API_CACHE[key] = cached_data
+                _API_CACHE_TS[key] = ts_int
+            continue
+
+        _API_CACHE[key] = value
+        _API_CACHE_TS[key] = now
+
+
+def _persist_api_cache_to_disk() -> None:
+    tmp_path = _CACHE_FILE.with_suffix(_CACHE_FILE.suffix + ".tmp")
+    try:
+        data_to_persist: Dict[str, Dict] = {}
+        for url, payload in _API_CACHE.items():
+            if not isinstance(url, str) or not isinstance(payload, dict):
+                continue
+            ts = _API_CACHE_TS.get(url)
+            if not isinstance(ts, int):
+                ts = int(time.time())
+                _API_CACHE_TS[url] = ts
+            data_to_persist[url] = {"ts": ts, "data": payload}
+        tmp_path.write_text(json.dumps(data_to_persist, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp_path, _CACHE_FILE)
+    except Exception:
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass
+
+
+_load_api_cache_from_disk()
 
 def search_yahoo_finance(
     query: str,
@@ -86,7 +148,11 @@ def search_yahoo_finance(
                     result_data = response.json()
                     # 4. 写入缓存
                     if use_cache and result_data:
+                        is_new_cache_entry = full_url not in _API_CACHE
                         _API_CACHE[full_url] = result_data
+                        if is_new_cache_entry:
+                            _API_CACHE_TS[full_url] = int(time.time())
+                            _persist_api_cache_to_disk()
                 except Exception as e:
                     print(f"解析 JSON 失败: {e}")
             else:
