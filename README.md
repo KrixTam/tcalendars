@@ -13,6 +13,9 @@ pip install tcalendars
 ```
 
 ## 示例
+
+**代码示例**
+
 ```python
 from tcalendars import TradingCalendars
 
@@ -51,4 +54,25 @@ StockNameCodeHelper.get_stock_code_by_english_name("HESAI GROUP")
 # 根据股票英文名称获取股票信息
 StockNameCodeHelper.get_stock_info_by_english_name("HESAI GROUP")
 # 输出：{'exchange': 'NMS', 'shortname': 'Hesai Group', 'quoteType': 'EQUITY', 'symbol': 'HSAI', 'index': 'quotes', 'score': 20006.0, 'typeDisp': '股票', 'longname': 'Hesai Group', 'exchDisp': 'NASDAQ', 'sector': 'Consumer Cyclical', 'sectorDisp': '消費週期性股票', 'industry': 'Auto Parts', 'industryDisp': '汽車零件', 'isYahooFinance': True}
+```
+
+*StockNameCodeHelper.get_stock_info_by_english_name* 返回结果示例：
+
+```json
+{
+  "exchange": "NMS",
+  "shortname": "Hesai Group",
+  "quoteType": "EQUITY",
+  "symbol": "HSAI",
+  "index": "quotes",
+  "score": 20012,
+  "typeDisp": "equity",
+  "longname": "Hesai Group",
+  "exchDisp": "NASDAQ",
+  "sector": "Consumer Cyclical",
+  "sectorDisp": "消費週期性股票",
+  "industry": "Auto Parts",
+  "industryDisp": "汽車零件",
+  "isYahooFinance": True
+}
 ```
