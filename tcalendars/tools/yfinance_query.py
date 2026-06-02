@@ -9,11 +9,12 @@ from pathlib import Path
 # 全局内存缓存，用于存储请求结果
 _API_CACHE: Dict[str, Dict] = {}
 _API_CACHE_TS: Dict[str, int] = {}
-_CACHE_FILE = Path(".yfinance_cache")
+_CACHE_FILE = Path(__file__).resolve().parents[1] / "cache" / ".yfinance_cache"
 _CACHE_MAX_AGE_SECONDS = 60 * 24 * 60 * 60
 
 
 def _load_api_cache_from_disk() -> None:
+    _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     if not _CACHE_FILE.is_file():
         return
     try:
@@ -44,6 +45,7 @@ def _load_api_cache_from_disk() -> None:
 
 
 def _persist_api_cache_to_disk() -> None:
+    _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = _CACHE_FILE.with_suffix(_CACHE_FILE.suffix + ".tmp")
     try:
         data_to_persist: Dict[str, Dict] = {}

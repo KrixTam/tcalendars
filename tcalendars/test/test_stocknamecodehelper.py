@@ -2,10 +2,11 @@ import unittest
 import os
 import tempfile
 import pandas as pd
-import tcalendars
 from os import path
 from unittest.mock import patch
 from tcalendars import StockNameCodeHelper
+from tcalendars import singleton as singleton_module
+from tcalendars import stock_name_code_helper as stock_module
 
 CWD = path.abspath(path.dirname(__file__))
 
@@ -35,24 +36,24 @@ class TestStockNameCodeHelper(unittest.TestCase):
         df_bj = pd.DataFrame({"证券代码": ["920002"], "证券简称": ["BJ"]})
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            original_instances = tcalendars.Singleton._instances
-            original_cwd = tcalendars.CWD
+            original_instances = singleton_module.Singleton._instances
+            original_cwd = stock_module.CWD
             try:
-                tcalendars.Singleton._instances = {}
-                tcalendars.CWD = tmp_dir
+                singleton_module.Singleton._instances = {}
+                stock_module.CWD = tmp_dir
 
-                with patch.object(tcalendars.path, "exists", return_value=False):
-                    with patch.object(tcalendars.ak, "stock_info_sh_name_code", side_effect=[df_sh, df_kc]):
-                        with patch.object(tcalendars.ak, "stock_info_sz_name_code", return_value=df_sz):
-                            with patch.object(tcalendars.ak, "stock_info_bj_name_code", return_value=df_bj):
-                                helper = tcalendars.StockNameCodeHelper()
+                with patch.object(stock_module.path, "exists", return_value=False):
+                    with patch.object(stock_module.ak, "stock_info_sh_name_code", side_effect=[df_sh, df_kc]):
+                        with patch.object(stock_module.ak, "stock_info_sz_name_code", return_value=df_sz):
+                            with patch.object(stock_module.ak, "stock_info_bj_name_code", return_value=df_bj):
+                                helper = StockNameCodeHelper()
 
                 self.assertEqual(helper.get_stock_name("000547"), "X")
                 self.assertEqual(helper.get_stock_name("000001"), "Y")
-                self.assertTrue(os.path.exists(os.path.join(tmp_dir, "stock_name_code.csv")))
+                self.assertTrue(os.path.exists(os.path.join(tmp_dir, "cache", "stock_name_code.csv")))
             finally:
-                tcalendars.CWD = original_cwd
-                tcalendars.Singleton._instances = original_instances
+                stock_module.CWD = original_cwd
+                singleton_module.Singleton._instances = original_instances
 
     def test_update_flag_true_when_file_outdated(self):
         df_sh = pd.DataFrame({"证券代码": ["547"], "证券简称": ["X"]})
@@ -74,59 +75,60 @@ class TestStockNameCodeHelper(unittest.TestCase):
             return _Moment("2000-01-02")
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            original_instances = tcalendars.Singleton._instances
-            original_cwd = tcalendars.CWD
+            original_instances = singleton_module.Singleton._instances
+            original_cwd = stock_module.CWD
             try:
-                tcalendars.Singleton._instances = {}
-                tcalendars.CWD = tmp_dir
-                stock_file = os.path.join(tmp_dir, "stock_name_code.csv")
+                singleton_module.Singleton._instances = {}
+                stock_module.CWD = tmp_dir
+                stock_file = os.path.join(tmp_dir, "cache", "stock_name_code.csv")
+                os.makedirs(os.path.dirname(stock_file), exist_ok=True)
                 with open(stock_file, "w", encoding="utf-8") as f:
                     f.write("code,name,market\n")
 
-                with patch.object(tcalendars.path, "exists", return_value=True):
-                    with patch.object(tcalendars.path, "getmtime", return_value=0):
-                        with patch.object(tcalendars, "moment", side_effect=_moment_side_effect):
-                            with patch.object(tcalendars.ak, "stock_info_sh_name_code", side_effect=[df_sh, df_kc]):
-                                with patch.object(tcalendars.ak, "stock_info_sz_name_code", return_value=df_sz):
-                                    with patch.object(tcalendars.ak, "stock_info_bj_name_code", return_value=df_bj):
-                                        helper = tcalendars.StockNameCodeHelper()
+                with patch.object(stock_module.path, "exists", return_value=True):
+                    with patch.object(stock_module.path, "getmtime", return_value=0):
+                        with patch.object(stock_module, "moment", side_effect=_moment_side_effect):
+                            with patch.object(stock_module.ak, "stock_info_sh_name_code", side_effect=[df_sh, df_kc]):
+                                with patch.object(stock_module.ak, "stock_info_sz_name_code", return_value=df_sz):
+                                    with patch.object(stock_module.ak, "stock_info_bj_name_code", return_value=df_bj):
+                                        helper = StockNameCodeHelper()
 
                 self.assertEqual(helper.get_stock_name("000547"), "X")
             finally:
-                tcalendars.CWD = original_cwd
-                tcalendars.Singleton._instances = original_instances
+                stock_module.CWD = original_cwd
+                singleton_module.Singleton._instances = original_instances
 
     def test_update_stock_name_code_exception_path(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            original_instances = tcalendars.Singleton._instances
-            original_cwd = tcalendars.CWD
+            original_instances = singleton_module.Singleton._instances
+            original_cwd = stock_module.CWD
             try:
-                tcalendars.Singleton._instances = {}
-                tcalendars.CWD = tmp_dir
-                with patch.object(tcalendars.path, "exists", return_value=False):
-                    with patch.object(tcalendars.ak, "stock_info_sh_name_code", side_effect=RuntimeError("x")):
-                        helper = tcalendars.StockNameCodeHelper()
+                singleton_module.Singleton._instances = {}
+                stock_module.CWD = tmp_dir
+                with patch.object(stock_module.path, "exists", return_value=False):
+                    with patch.object(stock_module.ak, "stock_info_sh_name_code", side_effect=RuntimeError("x")):
+                        helper = StockNameCodeHelper()
                         self.assertIsNotNone(helper._stock_name_code)
             finally:
-                tcalendars.CWD = original_cwd
-                tcalendars.Singleton._instances = original_instances
+                stock_module.CWD = original_cwd
+                singleton_module.Singleton._instances = original_instances
 
     def test_get_stock_code_by_english_name(self):
-        with patch.object(tcalendars.StockNameCodeHelper, "get_stock_info_by_english_name", return_value={"symbol": "HSAI"}):
-            self.assertEqual(tcalendars.StockNameCodeHelper.get_stock_code_by_english_name("HESAI GROUP"), "HSAI")
-        with patch.object(tcalendars.StockNameCodeHelper, "get_stock_info_by_english_name", return_value=None):
-            self.assertIsNone(tcalendars.StockNameCodeHelper.get_stock_code_by_english_name("HESAI GROUP"))
+        with patch.object(StockNameCodeHelper, "get_stock_info_by_english_name", return_value={"symbol": "HSAI"}):
+            self.assertEqual(StockNameCodeHelper.get_stock_code_by_english_name("HESAI GROUP"), "HSAI")
+        with patch.object(StockNameCodeHelper, "get_stock_info_by_english_name", return_value=None):
+            self.assertIsNone(StockNameCodeHelper.get_stock_code_by_english_name("HESAI GROUP"))
 
     def test_get_stock_info_by_english_name_branches(self):
-        with patch.object(tcalendars, "search_yahoo_finance", return_value=None):
-            self.assertIsNone(tcalendars.StockNameCodeHelper.get_stock_info_by_english_name("ANY"))
+        with patch.object(stock_module, "search_yahoo_finance", return_value=None):
+            self.assertIsNone(StockNameCodeHelper.get_stock_info_by_english_name("ANY"))
 
-        with patch.object(tcalendars, "search_yahoo_finance", return_value={"quotes": [{"symbol": "HSAI"}]}):
-            self.assertEqual(tcalendars.StockNameCodeHelper.get_stock_info_by_english_name("HESAI GROUP"), {"symbol": "HSAI"})
+        with patch.object(stock_module, "search_yahoo_finance", return_value={"quotes": [{"symbol": "HSAI"}]}):
+            self.assertEqual(StockNameCodeHelper.get_stock_info_by_english_name("HESAI GROUP"), {"symbol": "HSAI"})
 
-        with patch.object(tcalendars, "search_yahoo_finance", return_value={"quotes": []}):
-            with patch.object(tcalendars.StockNameCodeHelper, "get_stock_code_by_english_name", return_value="PONY"):
-                self.assertEqual(tcalendars.StockNameCodeHelper.get_stock_info_by_english_name("PONY AI (Class A)"), "PONY")
+        with patch.object(stock_module, "search_yahoo_finance", return_value={"quotes": []}):
+            with patch.object(StockNameCodeHelper, "get_stock_code_by_english_name", return_value="PONY"):
+                self.assertEqual(StockNameCodeHelper.get_stock_info_by_english_name("PONY AI (Class A)"), "PONY")
 
 if __name__ == '__main__':
     unittest.main()  # pragma: no cover

@@ -7,6 +7,7 @@ import tempfile
 import importlib
 import sys
 import runpy
+from pathlib import Path
 from unittest.mock import patch
 from os import path
 from moment import moment
@@ -22,6 +23,47 @@ class TestTools(unittest.TestCase):
         b = pd.read_csv(path.join(CWD, 'calendar.csv'))
         self.assertTrue(a.equals(b))
 
+    def test_get_se_calendars_append_dedup(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            rows_1 = [
+                {"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"},
+            ]
+            rows_2 = [
+                {"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"},
+                {"zrxh": "4", "jybz": "1", "jyrq": "2005-02-02"},
+            ]
+            with patch("tcalendars.tools.get_se_calendar.get_dates_by_month", side_effect=[rows_1, rows_2]):
+                get_calendar(start_date="2005-02-01", end_date="2005-02-01", dir=tmp_dir)
+                get_calendar(append=True, start_date="2005-02-01", end_date="2005-02-01", dir=tmp_dir)
+
+            df = pd.read_csv(get_calendar_filename(tmp_dir), dtype={"jyrq": str})
+            self.assertEqual(df["jyrq"].tolist(), ["2005-02-01", "2005-02-02"])
+
+    def test_get_se_calendars_append_empty_file_has_header(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            os.makedirs(path.dirname(get_calendar_filename(tmp_dir)), exist_ok=True)
+            open(get_calendar_filename(tmp_dir), "w").close()
+            rows = [{"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"}]
+            with patch("tcalendars.tools.get_se_calendar.get_dates_by_month", return_value=rows):
+                get_calendar(append=True, start_date="2005-02-01", end_date="2005-02-01", dir=tmp_dir)
+
+            with open(get_calendar_filename(tmp_dir), "r", encoding="utf-8") as f:
+                first_line = f.readline().strip()
+            self.assertEqual(first_line, "zrxh,jybz,jyrq")
+
+    def test_get_se_calendars_append_dedup_in_while_loop(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            rows_feb = [{"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"}]
+            rows_mar = [
+                {"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"},
+                {"zrxh": "4", "jybz": "1", "jyrq": "2005-03-01"},
+            ]
+            with patch("tcalendars.tools.get_se_calendar.get_dates_by_month", side_effect=[rows_feb, rows_mar]):
+                get_calendar(append=True, start_date="2005-02-01", end_date="2005-03-01", dir=tmp_dir)
+
+            df = pd.read_csv(get_calendar_filename(tmp_dir), dtype={"jyrq": str})
+            self.assertEqual(df["jyrq"].tolist(), ["2005-02-01", "2005-03-01"])
+
     def test_get_se_calendars_02(self):
         now = moment().format('YYYY-10-01')
         get_calendar(now)
@@ -32,28 +74,25 @@ class TestTools(unittest.TestCase):
 
     def test_get_calendar_filename_01(self):
         filename = get_calendar_filename('.')
-        self.assertEqual(filename, './se_calendar.csv')
+        self.assertEqual(filename, './cache/se_calendar.csv')
 
     def test_yfinance_cache_load_filters_old(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            prev_cwd = os.getcwd()
-            os.chdir(tmp_dir)
-            try:
-                now = int(time.time())
-                cache = {
-                    "https://example.com/new": {"ts": now - 59 * 24 * 60 * 60, "data": {"k": "v"}},
-                    "https://example.com/old": {"ts": now - 61 * 24 * 60 * 60, "data": {"k": "v2"}},
-                }
-                with open(".yfinance_cache", "w", encoding="utf-8") as f:
-                    json.dump(cache, f, ensure_ascii=False)
+            yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq._CACHE_FILE = Path(tmp_dir) / "cache" / ".yfinance_cache"
+            yq._CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            now = int(time.time())
+            cache = {
+                "https://example.com/new": {"ts": now - 59 * 24 * 60 * 60, "data": {"k": "v"}},
+                "https://example.com/old": {"ts": now - 61 * 24 * 60 * 60, "data": {"k": "v2"}},
+            }
+            yq._CACHE_FILE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+            yq._API_CACHE.clear()
+            yq._API_CACHE_TS.clear()
+            yq._load_api_cache_from_disk()
 
-                sys.modules.pop("tcalendars.tools.yfinance_query", None)
-                yq = importlib.import_module("tcalendars.tools.yfinance_query")
-
-                self.assertIn("https://example.com/new", yq._API_CACHE)
-                self.assertNotIn("https://example.com/old", yq._API_CACHE)
-            finally:
-                os.chdir(prev_cwd)
+            self.assertIn("https://example.com/new", yq._API_CACHE)
+            self.assertNotIn("https://example.com/old", yq._API_CACHE)
 
     def test_yfinance_cache_persist_only_on_new_entry(self):
         class _DummyResponse:
@@ -94,151 +133,119 @@ class TestTools(unittest.TestCase):
                 return False
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            prev_cwd = os.getcwd()
-            os.chdir(tmp_dir)
-            try:
-                sys.modules.pop("tcalendars.tools.yfinance_query", None)
-                yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq._CACHE_FILE = Path(tmp_dir) / "cache" / ".yfinance_cache"
+            yq._CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            yq._API_CACHE.clear()
+            yq._API_CACHE_TS.clear()
 
-                yq.sync_playwright = lambda: _DummyPlaywrightManager()
+            yq.sync_playwright = lambda: _DummyPlaywrightManager()
 
-                persist_calls = {"count": 0}
+            persist_calls = {"count": 0}
 
-                def _persist_spy():
-                    persist_calls["count"] += 1
+            def _persist_spy():
+                persist_calls["count"] += 1
 
-                yq._persist_api_cache_to_disk = _persist_spy
-
+            with patch.object(yq, "_persist_api_cache_to_disk", new=_persist_spy):
                 a = yq.search_yahoo_finance(query="AAPL", region="US", lang="zh_HK", quotes_count=1)
                 b = yq.search_yahoo_finance(query="AAPL", region="US", lang="zh_HK", quotes_count=1)
 
-                self.assertEqual(a, {"count": 1, "quotes": [{"symbol": "AAPL"}]})
-                self.assertEqual(b, {"count": 1, "quotes": [{"symbol": "AAPL"}]})
-                self.assertEqual(persist_calls["count"], 1)
-            finally:
-                os.chdir(prev_cwd)
+            self.assertEqual(a, {"count": 1, "quotes": [{"symbol": "AAPL"}]})
+            self.assertEqual(b, {"count": 1, "quotes": [{"symbol": "AAPL"}]})
+            self.assertEqual(persist_calls["count"], 1)
 
     def test_yfinance_cache_load_invalid_json_returns(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            prev_cwd = os.getcwd()
-            os.chdir(tmp_dir)
-            try:
-                with open(".yfinance_cache", "w", encoding="utf-8") as f:
-                    f.write("{invalid json")
-
-                sys.modules.pop("tcalendars.tools.yfinance_query", None)
-                yq = importlib.import_module("tcalendars.tools.yfinance_query")
-                self.assertEqual(yq._API_CACHE, {})
-            finally:
-                os.chdir(prev_cwd)
+            yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq._CACHE_FILE = Path(tmp_dir) / "cache" / ".yfinance_cache"
+            yq._CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            yq._CACHE_FILE.write_text("{invalid json", encoding="utf-8")
+            yq._API_CACHE.clear()
+            yq._API_CACHE_TS.clear()
+            yq._load_api_cache_from_disk()
+            self.assertEqual(yq._API_CACHE, {})
 
     def test_yfinance_cache_load_non_dict_root_returns(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            prev_cwd = os.getcwd()
-            os.chdir(tmp_dir)
-            try:
-                with open(".yfinance_cache", "w", encoding="utf-8") as f:
-                    json.dump([1, 2, 3], f, ensure_ascii=False)
-
-                sys.modules.pop("tcalendars.tools.yfinance_query", None)
-                yq = importlib.import_module("tcalendars.tools.yfinance_query")
-                self.assertEqual(yq._API_CACHE, {})
-            finally:
-                os.chdir(prev_cwd)
+            yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq._CACHE_FILE = Path(tmp_dir) / "cache" / ".yfinance_cache"
+            yq._CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            yq._CACHE_FILE.write_text(json.dumps([1, 2, 3], ensure_ascii=False), encoding="utf-8")
+            yq._API_CACHE.clear()
+            yq._API_CACHE_TS.clear()
+            yq._load_api_cache_from_disk()
+            self.assertEqual(yq._API_CACHE, {})
 
     def test_yfinance_cache_load_skips_bad_entries(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            prev_cwd = os.getcwd()
-            os.chdir(tmp_dir)
-            try:
-                with open(".yfinance_cache", "w", encoding="utf-8") as f:
-                    f.write("{}")
+            yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq._CACHE_FILE = Path(tmp_dir) / "cache" / ".yfinance_cache"
+            yq._CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            yq._CACHE_FILE.write_text("{}", encoding="utf-8")
 
-                sys.modules.pop("tcalendars.tools.yfinance_query", None)
-                yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            with patch.object(yq.json, "loads", return_value={1: {"ts": 0, "data": {}}, "u": "x"}):
+                yq._API_CACHE.clear()
+                yq._API_CACHE_TS.clear()
+                yq._load_api_cache_from_disk()
 
-                with patch.object(yq.json, "loads", return_value={1: {"ts": 0, "data": {}}, "u": "x"}):
-                    yq._API_CACHE.clear()
-                    yq._API_CACHE_TS.clear()
-                    yq._load_api_cache_from_disk()
-
-                self.assertEqual(yq._API_CACHE, {})
-            finally:
-                os.chdir(prev_cwd)
+            self.assertEqual(yq._API_CACHE, {})
 
     def test_yfinance_cache_load_legacy_shape_kept(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            prev_cwd = os.getcwd()
-            os.chdir(tmp_dir)
-            try:
-                now = int(time.time())
-                with open(".yfinance_cache", "w", encoding="utf-8") as f:
-                    json.dump({"https://example.com/legacy": {"a": 1}}, f, ensure_ascii=False)
+            yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq._CACHE_FILE = Path(tmp_dir) / "cache" / ".yfinance_cache"
+            yq._CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            now = int(time.time())
+            yq._CACHE_FILE.write_text(json.dumps({"https://example.com/legacy": {"a": 1}}, ensure_ascii=False), encoding="utf-8")
+            yq._API_CACHE.clear()
+            yq._API_CACHE_TS.clear()
+            yq._load_api_cache_from_disk()
 
-                sys.modules.pop("tcalendars.tools.yfinance_query", None)
-                yq = importlib.import_module("tcalendars.tools.yfinance_query")
-
-                self.assertEqual(yq._API_CACHE["https://example.com/legacy"], {"a": 1})
-                self.assertIn("https://example.com/legacy", yq._API_CACHE_TS)
-                self.assertTrue(now - yq._API_CACHE_TS["https://example.com/legacy"] <= 5)
-            finally:
-                os.chdir(prev_cwd)
+            self.assertEqual(yq._API_CACHE["https://example.com/legacy"], {"a": 1})
+            self.assertIn("https://example.com/legacy", yq._API_CACHE_TS)
+            self.assertTrue(now - yq._API_CACHE_TS["https://example.com/legacy"] <= 5)
 
     def test_yfinance_cache_persist_writes_schema_and_sets_ts(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            prev_cwd = os.getcwd()
-            os.chdir(tmp_dir)
-            try:
-                sys.modules.pop("tcalendars.tools.yfinance_query", None)
-                yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq._CACHE_FILE = Path(tmp_dir) / "cache" / ".yfinance_cache"
+            yq._CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            yq._API_CACHE.clear()
+            yq._API_CACHE_TS.clear()
+            yq._API_CACHE["https://example.com/a"] = {"x": 1}
 
-                yq._API_CACHE.clear()
-                yq._API_CACHE_TS.clear()
-                yq._API_CACHE["https://example.com/a"] = {"x": 1}
+            with patch.object(yq.time, "time", return_value=1234567890.0):
+                yq._persist_api_cache_to_disk()
 
-                with patch.object(yq.time, "time", return_value=1234567890.0):
-                    yq._persist_api_cache_to_disk()
-
-                with open(".yfinance_cache", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-
-                self.assertIn("https://example.com/a", data)
-                self.assertEqual(data["https://example.com/a"]["data"], {"x": 1})
-                self.assertEqual(data["https://example.com/a"]["ts"], 1234567890)
-                self.assertEqual(yq._API_CACHE_TS["https://example.com/a"], 1234567890)
-            finally:
-                os.chdir(prev_cwd)
+            data = json.loads(yq._CACHE_FILE.read_text(encoding="utf-8"))
+            self.assertIn("https://example.com/a", data)
+            self.assertEqual(data["https://example.com/a"]["data"], {"x": 1})
+            self.assertEqual(data["https://example.com/a"]["ts"], 1234567890)
+            self.assertEqual(yq._API_CACHE_TS["https://example.com/a"], 1234567890)
 
     def test_yfinance_cache_persist_replace_error_cleans_tmp(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            prev_cwd = os.getcwd()
-            os.chdir(tmp_dir)
-            try:
-                sys.modules.pop("tcalendars.tools.yfinance_query", None)
-                yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq = importlib.import_module("tcalendars.tools.yfinance_query")
+            yq._CACHE_FILE = Path(tmp_dir) / "cache" / ".yfinance_cache"
+            yq._CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            yq._API_CACHE.clear()
+            yq._API_CACHE_TS.clear()
+            yq._API_CACHE["https://example.com/a"] = {"x": 1}
+            yq._API_CACHE_TS["https://example.com/a"] = 1
 
-                yq._API_CACHE.clear()
-                yq._API_CACHE_TS.clear()
-                yq._API_CACHE["https://example.com/a"] = {"x": 1}
-                yq._API_CACHE_TS["https://example.com/a"] = 1
+            def _raise_replace(_src, _dst):
+                raise RuntimeError("fail")
 
-                def _raise_replace(_src, _dst):
-                    raise RuntimeError("fail")
+            tmp_path = yq._CACHE_FILE.with_suffix(yq._CACHE_FILE.suffix + ".tmp")
+            with patch.object(yq.os, "replace", side_effect=_raise_replace):
+                yq._persist_api_cache_to_disk()
 
-                with patch.object(yq.os, "replace", side_effect=_raise_replace):
-                    yq._persist_api_cache_to_disk()
-
-                self.assertFalse(os.path.exists(".yfinance_cache.tmp"))
-            finally:
-                os.chdir(prev_cwd)
+            self.assertFalse(tmp_path.exists())
 
     def test_yfinance_search_handles_response_not_ok(self):
         class _DummyResponse:
             ok = False
             status = 500
-
-            def json(self):
-                raise RuntimeError("unexpected")
 
         class _DummyPage:
             def goto(self, *_args, **_kwargs):
@@ -402,7 +409,8 @@ class TestTools(unittest.TestCase):
 
         class _DummyContext:
             def new_page(self):
-                page_ref["page"] = _DummyPage()
+                if page_ref["page"] is None:
+                    page_ref["page"] = _DummyPage()
                 return page_ref["page"]
 
         class _DummyBrowser:
@@ -433,7 +441,10 @@ class TestTools(unittest.TestCase):
             try:
                 sys.modules.pop("tcalendars.tools.yfinance_query", None)
                 with patch("playwright.sync_api.sync_playwright", new=lambda: _DummyPlaywrightManager()):
-                    runpy.run_module("tcalendars.tools.yfinance_query", run_name="__main__")
+                    with patch("pathlib.Path.is_file", return_value=False):
+                        with patch("pathlib.Path.write_text", return_value=0):
+                            with patch("os.replace", return_value=None):
+                                runpy.run_module("tcalendars.tools.yfinance_query", run_name="__main__")
 
                 self.assertIsNotNone(page_ref["page"])
             finally:

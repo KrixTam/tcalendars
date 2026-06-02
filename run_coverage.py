@@ -28,6 +28,7 @@ test_modules = [
     'tcalendars.test.test_tools',
     'tcalendars.test.test_tradingcalendars',
     'tcalendars.test.test_stocknamecodehelper',
+    'tcalendars.test.test_fundnamecodehelper',
 ]
 
 # 执行测试用例

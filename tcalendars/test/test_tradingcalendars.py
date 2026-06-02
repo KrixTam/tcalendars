@@ -1,6 +1,7 @@
 import unittest
 from os import path
 import shutil
+import os
 from tcalendars import TradingCalendars
 from tcalendars.tools.get_se_calendar import get_calendar_filename
 
@@ -11,6 +12,7 @@ class TestTradingCalendars(unittest.TestCase):
     def test_normal(self):
         src_filename = path.join(CWD, 'calendar.csv')
         dis_filename = get_calendar_filename(path.dirname(CWD))
+        os.makedirs(path.dirname(dis_filename), exist_ok=True)
         shutil.copy(src_filename, dis_filename)
         tc = TradingCalendars()
         self.assertFalse(tc.is_trading_day('2024-11-24'))
