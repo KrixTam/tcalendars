@@ -7,6 +7,7 @@ from unittest.mock import patch
 from tcalendars import StockNameCodeHelper
 from tcalendars import singleton as singleton_module
 from tcalendars import stock_name_code_helper as stock_module
+from tcalendars.db import DatabaseManager
 
 CWD = path.abspath(path.dirname(__file__))
 
@@ -50,7 +51,7 @@ class TestStockNameCodeHelper(unittest.TestCase):
 
                 self.assertEqual(helper.get_stock_name("000547"), "X")
                 self.assertEqual(helper.get_stock_name("000001"), "Y")
-                self.assertTrue(os.path.exists(os.path.join(tmp_dir, "cache", "stock_name_code.csv")))
+                self.assertTrue(os.path.exists(os.path.join(tmp_dir, "cache", "data.dat")))
             finally:
                 stock_module.CWD = original_cwd
                 singleton_module.Singleton._instances = original_instances
@@ -61,37 +62,22 @@ class TestStockNameCodeHelper(unittest.TestCase):
         df_sz = pd.DataFrame({"A股代码": ["000001"], "A股简称": ["Y2"]})
         df_bj = pd.DataFrame({"证券代码": ["920002"], "证券简称": ["BJ"]})
 
-        class _Moment:
-            def __init__(self, value):
-                self._value = value
-
-            def format(self, _fmt):
-                return self._value
-
-        def _moment_side_effect(*args, **kwargs):
-            _ = kwargs
-            if args:
-                return _Moment("2000-01-01")
-            return _Moment("2000-01-02")
-
         with tempfile.TemporaryDirectory() as tmp_dir:
             original_instances = singleton_module.Singleton._instances
             original_cwd = stock_module.CWD
             try:
                 singleton_module.Singleton._instances = {}
                 stock_module.CWD = tmp_dir
-                stock_file = os.path.join(tmp_dir, "cache", "stock_name_code.csv")
-                os.makedirs(os.path.dirname(stock_file), exist_ok=True)
-                with open(stock_file, "w", encoding="utf-8") as f:
-                    f.write("code,name,market\n")
+                
+                # 预设旧的 metadata
+                db = DatabaseManager(tmp_dir)
+                db.set_last_update('stock_name_code', '2000-01-01')
 
-                with patch.object(stock_module.path, "exists", return_value=True):
-                    with patch.object(stock_module.path, "getmtime", return_value=0):
-                        with patch.object(stock_module, "moment", side_effect=_moment_side_effect):
-                            with patch.object(stock_module.ak, "stock_info_sh_name_code", side_effect=[df_sh, df_kc]):
-                                with patch.object(stock_module.ak, "stock_info_sz_name_code", return_value=df_sz):
-                                    with patch.object(stock_module.ak, "stock_info_bj_name_code", return_value=df_bj):
-                                        helper = StockNameCodeHelper()
+                with patch.object(stock_module, "moment", return_value=type('Moment', (), {'format': lambda self, fmt: '2000-01-02'})()):
+                    with patch.object(stock_module.ak, "stock_info_sh_name_code", side_effect=[df_sh, df_kc]):
+                        with patch.object(stock_module.ak, "stock_info_sz_name_code", return_value=df_sz):
+                            with patch.object(stock_module.ak, "stock_info_bj_name_code", return_value=df_bj):
+                                helper = StockNameCodeHelper()
 
                 self.assertEqual(helper.get_stock_name("000547"), "X")
             finally:
@@ -127,8 +113,8 @@ class TestStockNameCodeHelper(unittest.TestCase):
             self.assertEqual(StockNameCodeHelper.get_stock_info_by_english_name("HESAI GROUP"), {"symbol": "HSAI"})
 
         with patch.object(stock_module, "search_yahoo_finance", return_value={"quotes": []}):
-            with patch.object(StockNameCodeHelper, "get_stock_code_by_english_name", return_value="PONY"):
-                self.assertEqual(StockNameCodeHelper.get_stock_info_by_english_name("PONY AI (Class A)"), "PONY")
+            with patch.object(StockNameCodeHelper, "get_stock_info_by_english_name", return_value={"symbol": "PONY"}):
+                self.assertEqual(StockNameCodeHelper.get_stock_info_by_english_name("PONY AI (Class A)"), {"symbol": "PONY"})
 
 if __name__ == '__main__':
     unittest.main()  # pragma: no cover

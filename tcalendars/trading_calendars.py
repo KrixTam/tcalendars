@@ -2,34 +2,49 @@ from os import path
 import pandas as pd
 import numpy as np
 from moment import moment
-from tcalendars.tools.get_se_calendar import get_calendar_filename, get_calendar
+from tcalendars.tools.get_se_calendar import get_calendar
 from tcalendars.singleton import Singleton
+from tcalendars.db import DatabaseManager
 
 CWD = path.abspath(path.dirname(__file__))
-SE_DTYPE = {'zrxh': np.int8, 'jybz': np.int8, 'jyrq': str}
 
 
 class TradingCalendars(metaclass=Singleton):
     def __init__(self):
-        self._se_calendars_filename = get_calendar_filename(CWD)
+        self._db = DatabaseManager(CWD)
         self.update_calendar()
+
+    def init_calendar(self): # pragma: no cover
+        '''
+        初始化交易日历
+        '''
+        get_calendar(dir=CWD)
+        self._load_calendar()
+
+    def _load_calendar(self):
+        df = self._db.read_dataframe('se_calendar')
+        if not df.empty:
+            # 确保类型正确
+            df['zrxh'] = df['zrxh'].astype(np.int8)
+            df['jybz'] = df['jybz'].astype(np.int8)
+            df['jyrq'] = df['jyrq'].astype(str)
+            self._se_calendar = df
+        else:
+            self._se_calendar = pd.DataFrame(columns=['zrxh', 'jybz', 'jyrq']) # pragma: no cover
 
     def update_calendar(self):
         '''
         更新交易日历
         '''
-        # 更新新增的交易日历
-        if path.exists(self._se_calendars_filename):
-            self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
+        self._load_calendar()
+        if not self._se_calendar.empty:
             now_year_last_day = moment().format('YYYY-12-31')
             latest_date = self._se_calendar['jyrq'].max()
             if latest_date < now_year_last_day:
                 get_calendar(True, latest_date, None, CWD)
-                self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
-        # 初始化下载交易日历
-        else:  # pragma: no cover
-            get_calendar(dir=CWD)
-            self._se_calendar = pd.read_csv(self._se_calendars_filename, dtype=SE_DTYPE)
+                self._load_calendar()
+        else:
+            self.init_calendar() # pragma: no cover
 
     def is_trading_day(self, dt):
         '''

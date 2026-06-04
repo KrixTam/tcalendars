@@ -6,6 +6,7 @@ from unittest.mock import patch
 from tcalendars.fund_name_code_helper import FundNameCodeHelper
 from tcalendars import fund_name_code_helper as fund_module
 from tcalendars import singleton as singleton_module
+from tcalendars.db import DatabaseManager
 
 
 class TestFundNameCodeHelper(unittest.TestCase):
@@ -29,7 +30,7 @@ class TestFundNameCodeHelper(unittest.TestCase):
                         helper = FundNameCodeHelper()
 
                 self.assertEqual(helper.get_fund_name("000001"), "新能源ETF联接A")
-                self.assertTrue(os.path.exists(os.path.join(tmp_dir, "cache", "fund_name_code.csv")))
+                self.assertTrue(os.path.exists(os.path.join(tmp_dir, "cache", "data.dat")))
                 self.assertIsNone(helper.get_fund_name("999999"))
             finally:
                 fund_module.CWD = original_cwd
@@ -38,31 +39,20 @@ class TestFundNameCodeHelper(unittest.TestCase):
     def test_update_fund_name_code_success_when_file_outdated(self):
         df = pd.DataFrame({"基金代码": ["000001"], "基金简称": ["中证红利"]})
 
-        class _Moment:
-            def __init__(self, value):
-                self._value = value
-
-            def format(self, _fmt):
-                return self._value
-
-        def _moment_side_effect(*args, **kwargs):
-            _ = kwargs
-            if args:
-                return _Moment("2000-01-01")
-            return _Moment("2000-01-02")
-
         with tempfile.TemporaryDirectory() as tmp_dir:
             original_instances = singleton_module.Singleton._instances
             original_cwd = fund_module.CWD
             try:
                 singleton_module.Singleton._instances = {}
                 fund_module.CWD = tmp_dir
+                
+                # 预设旧的 metadata
+                db = DatabaseManager(tmp_dir)
+                db.set_last_update('fund_name_code', '2000-01-01')
 
-                with patch.object(fund_module.path, "exists", return_value=True):
-                    with patch.object(fund_module.path, "getmtime", return_value=0):
-                        with patch.object(fund_module, "moment", side_effect=_moment_side_effect):
-                            with patch.object(fund_module.ak, "fund_name_em", return_value=df):
-                                helper = FundNameCodeHelper()
+                with patch.object(fund_module, "moment", return_value=type('Moment', (), {'format': lambda self, fmt: '2000-01-02'})()):
+                    with patch.object(fund_module.ak, "fund_name_em", return_value=df):
+                        helper = FundNameCodeHelper()
 
                 self.assertEqual(helper.get_fund_name("000001"), "中证红利")
             finally:
@@ -82,7 +72,10 @@ class TestFundNameCodeHelper(unittest.TestCase):
                         helper = FundNameCodeHelper()
 
                 self.assertIsNotNone(helper._fund_name_code)
-                self.assertFalse(os.path.exists(os.path.join(tmp_dir, "cache", "fund_name_code.csv")))
+                # DatabaseManager(tmp_dir) 会自动创建文件，所以这里不检查文件不存在，而是检查表是否没数据
+                db = DatabaseManager(tmp_dir)
+                df = db.read_dataframe('fund_name_code')
+                self.assertTrue(df.empty)
             finally:
                 fund_module.CWD = original_cwd
                 singleton_module.Singleton._instances = original_instances

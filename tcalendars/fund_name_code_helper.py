@@ -1,18 +1,17 @@
 from os import path
-import os
 import pandas as pd
 import re
 from moment import moment
-from datetime import datetime
 import akshare as ak
 from tcalendars.singleton import Singleton
+from tcalendars.db import DatabaseManager
 
 CWD = path.abspath(path.dirname(__file__))
 
 
 class FundNameCodeHelper(metaclass=Singleton):
     def __init__(self):
-        self._fund_name_code_filename = path.join(CWD, 'cache', 'fund_name_code.csv')
+        self._db = DatabaseManager(CWD)
         self._fund_name_code = pd.DataFrame(columns=['code', 'name'])
         self.update_fund_name_code()
 
@@ -21,29 +20,36 @@ class FundNameCodeHelper(metaclass=Singleton):
         更新基金名称代码表
         '''
         update_flag = False
-        if path.exists(self._fund_name_code_filename):
-            today = moment().format('YYYY-MM-DD')
-            file_timestamp = moment(datetime.fromtimestamp(path.getmtime(self._fund_name_code_filename))).format('YYYY-MM-DD')
-            if file_timestamp < today:
+        last_update = self._db.get_last_update('fund_name_code')
+        today = moment().format('YYYY-MM-DD')
+        
+        if last_update:
+            if last_update < today:
                 update_flag = True
         else:
             update_flag = True
+            
         if update_flag:
             try:
-                os.makedirs(path.dirname(self._fund_name_code_filename), exist_ok=True)
                 df = ak.fund_name_em()
                 df = df.rename(columns={"基金代码": "code", "基金简称": "name"})
                 df = df[['code', 'name']]
                 df["code"] = df["code"].astype(str).str.zfill(6)
                 df = df.drop_duplicates(subset=["code"], keep="first")
-                df.to_csv(self._fund_name_code_filename, index=False, encoding="utf-8-sig")
+                
+                # 保存到DB
+                self._db.save_dataframe('fund_name_code', df)
+                self._db.set_last_update('fund_name_code', today)
+                
                 self._fund_name_code = df
                 print(f"更新基金名称代码表成功，共{len(df)}条记录")
             except Exception as e:
                 print(f"更新基金名称代码表失败：{e}")
+                # 尝试加载旧数据
+                self._fund_name_code = self._db.read_dataframe('fund_name_code')
         else:  # pragma: no cover
             print(f"基金名称代码表已最新，无需更新")
-            self._fund_name_code = pd.read_csv(self._fund_name_code_filename, dtype={'code': str, 'name': str})
+            self._fund_name_code = self._db.read_dataframe('fund_name_code')
 
     def get_fund_name(self, code: str):
         '''

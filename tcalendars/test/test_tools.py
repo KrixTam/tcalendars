@@ -8,10 +8,12 @@ import importlib
 import sys
 import runpy
 from pathlib import Path
+from contextlib import closing
 from unittest.mock import patch
 from os import path
 from moment import moment
 from tcalendars.tools.get_se_calendar import get_calendar_filename, get_calendar
+from tcalendars.db import DatabaseManager
 
 CWD = path.abspath(path.dirname(__file__))
 
@@ -19,62 +21,81 @@ CWD = path.abspath(path.dirname(__file__))
 class TestTools(unittest.TestCase):
     def test_get_se_calendars_01(self):
         get_calendar('2005-02-01', '2005-03-01')
-        a = pd.read_csv(get_calendar_filename())
+        db = DatabaseManager()
+        a = db.read_dataframe('se_calendar')
         b = pd.read_csv(path.join(CWD, 'calendar.csv'))
+        # 确保类型一致以便比较
+        a['zrxh'] = a['zrxh'].astype(int)
+        a['jybz'] = a['jybz'].astype(int)
+        a['jyrq'] = a['jyrq'].astype(str)
+        b['zrxh'] = b['zrxh'].astype(int)
+        b['jybz'] = b['jybz'].astype(int)
+        b['jyrq'] = b['jyrq'].astype(str)
         self.assertTrue(a.equals(b))
 
     def test_get_se_calendars_append_dedup(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             rows_1 = [
-                {"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"},
+                {"zrxh": 3, "jybz": 1, "jyrq": "2005-02-01"},
             ]
             rows_2 = [
-                {"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"},
-                {"zrxh": "4", "jybz": "1", "jyrq": "2005-02-02"},
+                {"zrxh": 3, "jybz": 1, "jyrq": "2005-02-01"},
+                {"zrxh": 4, "jybz": 1, "jyrq": "2005-02-02"},
             ]
             with patch("tcalendars.tools.get_se_calendar.get_dates_by_month", side_effect=[rows_1, rows_2]):
                 get_calendar(start_date="2005-02-01", end_date="2005-02-01", dir=tmp_dir)
                 get_calendar(append=True, start_date="2005-02-01", end_date="2005-02-01", dir=tmp_dir)
 
-            df = pd.read_csv(get_calendar_filename(tmp_dir), dtype={"jyrq": str})
+            db = DatabaseManager(tmp_dir)
+            df = db.read_dataframe('se_calendar')
             self.assertEqual(df["jyrq"].tolist(), ["2005-02-01", "2005-02-02"])
 
     def test_get_se_calendars_append_empty_file_has_header(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            os.makedirs(path.dirname(get_calendar_filename(tmp_dir)), exist_ok=True)
-            open(get_calendar_filename(tmp_dir), "w").close()
-            rows = [{"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"}]
+            db_path = get_calendar_filename(tmp_dir)
+            # DatabaseManager(tmp_dir) 会自动创建表
+            db = DatabaseManager(tmp_dir)
+            # 确保表为空
+            db.execute('DELETE FROM se_calendar')
+            
+            rows = [{"zrxh": 3, "jybz": 1, "jyrq": "2005-02-01"}]
             with patch("tcalendars.tools.get_se_calendar.get_dates_by_month", return_value=rows):
                 get_calendar(append=True, start_date="2005-02-01", end_date="2005-02-01", dir=tmp_dir)
 
-            with open(get_calendar_filename(tmp_dir), "r", encoding="utf-8") as f:
-                first_line = f.readline().strip()
-            self.assertEqual(first_line, "zrxh,jybz,jyrq")
+            db = DatabaseManager(tmp_dir)
+            with closing(db.get_connection()) as conn:
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA table_info(se_calendar)")
+                columns = [info[1] for info in cursor.fetchall()]
+            self.assertEqual(columns, ["zrxh", "jybz", "jyrq"])
 
     def test_get_se_calendars_append_dedup_in_while_loop(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            rows_feb = [{"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"}]
+            rows_feb = [{"zrxh": 3, "jybz": 1, "jyrq": "2005-02-01"}]
             rows_mar = [
-                {"zrxh": "3", "jybz": "1", "jyrq": "2005-02-01"},
-                {"zrxh": "4", "jybz": "1", "jyrq": "2005-03-01"},
+                {"zrxh": 3, "jybz": 1, "jyrq": "2005-02-01"},
+                {"zrxh": 4, "jybz": 1, "jyrq": "2005-03-01"},
             ]
             with patch("tcalendars.tools.get_se_calendar.get_dates_by_month", side_effect=[rows_feb, rows_mar]):
                 get_calendar(append=True, start_date="2005-02-01", end_date="2005-03-01", dir=tmp_dir)
 
-            df = pd.read_csv(get_calendar_filename(tmp_dir), dtype={"jyrq": str})
+            db = DatabaseManager(tmp_dir)
+            df = db.read_dataframe('se_calendar')
             self.assertEqual(df["jyrq"].tolist(), ["2005-02-01", "2005-03-01"])
 
     def test_get_se_calendars_02(self):
         now = moment().format('YYYY-10-01')
         get_calendar(now)
-        a = pd.read_csv(get_calendar_filename())
+        db = DatabaseManager()
+        a = db.read_dataframe('se_calendar')
         get_calendar(now, moment().format('YYYY-12-02'))
-        b = pd.read_csv(get_calendar_filename())
+        b = db.read_dataframe('se_calendar')
         self.assertTrue(a.equals(b))
 
     def test_get_calendar_filename_01(self):
-        filename = get_calendar_filename('.')
-        self.assertEqual(filename, './cache/se_calendar.csv')
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            filename = get_calendar_filename(tmp_dir)
+            self.assertEqual(filename, path.join(tmp_dir, 'cache', 'data.dat'))
 
     def test_yfinance_cache_load_filters_old(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -1,10 +1,8 @@
 import random
 import requests
-import csv
 import time
-import os
 from moment import moment
-from os import path
+from tcalendars.db import DatabaseManager
 
 SZSE_URL = 'http://www.szse.cn/api/report/exchange/onepersistenthour/monthList'
 
@@ -24,20 +22,15 @@ def get_dates_by_month(date: str):
 
 def get_calendar_filename(dir: str = None):
     '''
-    获取交易日历文件名
+    获取交易日历数据库路径
     '''
-    output_filename = 'se_calendar.csv'
-    if dir is None:
-        dir_name = path.dirname(path.dirname(__file__))
-    else:
-        dir_name = dir
-    return path.join(dir_name, 'cache', output_filename)
+    return DatabaseManager(dir).db_path
 
 
 def get_calendar(append: bool = False, start_date: str = '2005-01-01', end_date: str = None, dir: str = None):
     '''
     获取A股交易日历
-    :param append: 是否追加到已存在文件
+    :param append: 是否追加到已存在记录
     :param start_date: 开始日期
     :param end_date: 结束日期
     :param dir: 输出目录
@@ -56,52 +49,26 @@ def get_calendar(append: bool = False, start_date: str = '2005-01-01', end_date:
         now = moment(moment().format('YYYY-12-31'))
     else:
         now = moment(end_date)
-    filename = get_calendar_filename(dir)
-    os.makedirs(path.dirname(filename), exist_ok=True)
-    existing_dates = set()
-    mode = 'w'
-    fieldnames = None
-    write_header = True
-    if append and path.exists(filename):
-        mode = 'a'
-        write_header = False
-        with open(filename, 'r') as rf:
-            reader = csv.DictReader(rf)
-            fieldnames = reader.fieldnames
-            for row in reader:
-                jyrq = row.get('jyrq')
-                if jyrq:
-                    existing_dates.add(jyrq)
-        if not fieldnames:
-            mode = 'w'
-            write_header = True
-    with open(filename, mode) as fd:
-        w = None
-        for d in get_dates_by_month(dt):
-            if w is None:
-                w = csv.DictWriter(fd, fieldnames=fieldnames or list(d.keys()))
-                if write_header:
-                    w.writeheader()
-            if append:
-                jyrq = d.get('jyrq')
-                if jyrq in existing_dates:
-                    continue
-                if jyrq:
-                    existing_dates.add(jyrq)
-            w.writerow(d)
+    
+    db = DatabaseManager(dir)
+    
+    if not append:
+        db.execute('DELETE FROM se_calendar')
+    
+    def save_data(data):
+        for d in data:
+            db.execute('''
+                INSERT OR REPLACE INTO se_calendar (zrxh, jybz, jyrq)
+                VALUES (?, ?, ?)
+            ''', (d['zrxh'], d['jybz'], d['jyrq']))
+
+    save_data(get_dates_by_month(dt))
+    dt.add(1, 'months', inplace=True)
+    count = 0
+    while dt <= now:
+        save_data(get_dates_by_month(dt))
+        count = count + 1
+        if count > 10:  # pragma: no cover
+            time.sleep(4 + int(random.random()*10))
+            count = 0
         dt.add(1, 'months', inplace=True)
-        count = 0
-        while dt <= now:
-            for d in get_dates_by_month(dt):
-                if append:
-                    jyrq = d.get('jyrq')
-                    if jyrq in existing_dates:
-                        continue
-                    if jyrq:
-                        existing_dates.add(jyrq)
-                w.writerow(d)
-            count = count + 1
-            if count > 10:  # pragma: no cover
-                time.sleep(4 + int(random.random()*10))
-                count = 0
-            dt.add(1, 'months', inplace=True)

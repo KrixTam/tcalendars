@@ -15,11 +15,9 @@ pip install tcalendars
 ## 缓存
 
 - `StockNameCodeHelper.get_stock_code_by_english_name` / `StockNameCodeHelper.get_stock_info_by_english_name` 会通过 Playwright 调用 Yahoo Finance 搜索接口
-- 所有数据缓存文件统一存放在 `tcalendars/cache/` 目录下：
-  - 交易日历：`tcalendars/cache/se_calendar.csv`（`TradingCalendars` 会在需要时自动追加更新）
-  - 股票名称代码：`tcalendars/cache/stock_name_code.csv`（`StockNameCodeHelper` 会按天更新）
-  - 基金名称代码：`tcalendars/cache/fund_name_code.csv`（`FundNameCodeHelper` 会按天更新）
-  - Yahoo Finance 查询：`tcalendars/cache/.yfinance_cache`（启动时自动加载到内存缓存）
+- 所有数据缓存统一存放在 `tcalendars/cache/` 目录下：
+  - 数据库：`tcalendars/cache/data.dat` (SQLite 格式，包含交易日历、股票名称代码、基金名称代码等)
+  - Yahoo Finance 查询：`tcalendars/cache/.yfinance_cache`（JSON 格式，启动时自动加载到内存缓存）
 - `.yfinance_cache` 超过 60 天的缓存不会加载到内存（删除该文件可重建缓存）
 
 ## 示例
