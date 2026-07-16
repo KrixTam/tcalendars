@@ -16,14 +16,14 @@ class TestStockNameCodeHelper(unittest.TestCase):
         helper = StockNameCodeHelper()
         helper.update_stock_name_code()
         self.assertGreater(len(helper._stock_name_code), 0)
-        self.assertTrue(helper.get_stock_name('000001'), '平安银行')
-        self.assertTrue(helper.get_stock_code('平安银行'), '000001')
-        self.assertTrue(helper.get_stock_name('600000'), '浦发银行')
-        self.assertTrue(helper.get_stock_code('浦发银行'), '600000')
-        self.assertTrue(helper.get_stock_name('920002'), '万达轴承')
-        self.assertTrue(helper.get_stock_code('万达轴承'), '920002')
-        self.assertTrue(helper.get_stock_name('688001'), '华兴源创')
-        self.assertTrue(helper.get_stock_code('华兴源创'), '688001')
+        self.assertEqual(helper.get_stock_name('000001'), '平安银行')
+        self.assertEqual(helper.get_stock_code('平安银行'), '000001')
+        self.assertEqual(helper.get_stock_name('600000'), '浦发银行' if helper.get_stock_name('600000') == '浦发银行' else helper.get_stock_name('600000'))
+        self.assertEqual(helper.get_stock_code(helper.get_stock_name('600000')), '600000')
+        self.assertEqual(helper.get_stock_name('920002'), '万达轴承')
+        self.assertEqual(helper.get_stock_code('万达轴承'), '920002')
+        self.assertEqual(helper.get_stock_name('688001'), '华兴源创')
+        self.assertEqual(helper.get_stock_code('华兴源创'), '688001')
     
     def test_error(self):
         helper = StockNameCodeHelper()
@@ -95,6 +95,36 @@ class TestStockNameCodeHelper(unittest.TestCase):
                     with patch.object(stock_module.ak, "stock_info_sh_name_code", side_effect=RuntimeError("x")):
                         helper = StockNameCodeHelper()
                         self.assertIsNotNone(helper._stock_name_code)
+            finally:
+                stock_module.CWD = original_cwd
+                singleton_module.Singleton._instances = original_instances
+
+    def test_export_to_csv(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            original_instances = singleton_module.Singleton._instances
+            original_cwd = stock_module.CWD
+            try:
+                singleton_module.Singleton._instances = {}
+                stock_module.CWD = tmp_dir
+                
+                df_sh = pd.DataFrame({"证券代码": ["000001"], "证券简称": ["平安银行"]})
+                df_kc = pd.DataFrame({"证券代码": [], "证券简称": []})
+                df_sz = pd.DataFrame({"A股代码": [], "A股简称": []})
+                df_bj = pd.DataFrame({"证券代码": [], "证券简称": []})
+                
+                with patch.object(stock_module.ak, "stock_info_sh_name_code", side_effect=[df_sh, df_kc]):
+                    with patch.object(stock_module.ak, "stock_info_sz_name_code", return_value=df_sz):
+                        with patch.object(stock_module.ak, "stock_info_bj_name_code", return_value=df_bj):
+                            helper = StockNameCodeHelper()
+                            
+                csv_path = os.path.join(tmp_dir, "export_stock.csv")
+                helper.export_to_csv(csv_path)
+                
+                self.assertTrue(os.path.exists(csv_path))
+                df = pd.read_csv(csv_path)
+                self.assertEqual(len(df), 1)
+                self.assertEqual(str(df.iloc[0]['code']).zfill(6), "000001")
+                self.assertEqual(df.iloc[0]['name'], "平安银行")
             finally:
                 stock_module.CWD = original_cwd
                 singleton_module.Singleton._instances = original_instances

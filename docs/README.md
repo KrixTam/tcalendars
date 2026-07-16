@@ -63,6 +63,9 @@ StockNameCodeHelper.get_stock_code_by_english_name("HESAI GROUP")
 StockNameCodeHelper.get_stock_info_by_english_name("HESAI GROUP")
 # 输出：{'exchange': 'NMS', 'shortname': 'Hesai Group', 'quoteType': 'EQUITY', 'symbol': 'HSAI', 'index': 'quotes', 'score': 20006.0, 'typeDisp': '股票', 'longname': 'Hesai Group', 'exchDisp': 'NASDAQ', 'sector': 'Consumer Cyclical', 'sectorDisp': '消費週期性股票', 'industry': 'Auto Parts', 'industryDisp': '汽車零件', 'isYahooFinance': True}
 
+# 导出股票名称代码表到CSV文件
+helper.export_to_csv('stock_name_code.csv')
+
 from tcalendars import FundNameCodeHelper
 
 fund_helper = FundNameCodeHelper()
@@ -82,6 +85,9 @@ fund_helper.search_by_keyword('华夏')
 #   code name
 # 0  000001 华夏成长混合
 # ...
+
+# 导出基金名称代码表到CSV文件
+fund_helper.export_to_csv('fund_name_code.csv')
 ```
 
 *StockNameCodeHelper.get_stock_info_by_english_name* 返回结果示例：

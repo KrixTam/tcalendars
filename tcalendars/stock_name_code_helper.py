@@ -93,6 +93,13 @@ class StockNameCodeHelper(metaclass=Singleton):
         except IndexError:
             res = None
         return res
+
+    def export_to_csv(self, file_path: str):
+        '''
+        导出股票名称代码表到CSV文件
+        '''
+        if not self._stock_name_code.empty:
+            self._stock_name_code.to_csv(file_path, index=False, encoding='utf-8')
     
     @staticmethod
     def get_stock_code_by_english_name(name: str):

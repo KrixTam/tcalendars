@@ -80,6 +80,30 @@ class TestFundNameCodeHelper(unittest.TestCase):
                 fund_module.CWD = original_cwd
                 singleton_module.Singleton._instances = original_instances
 
+    def test_export_to_csv(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            original_instances = singleton_module.Singleton._instances
+            original_cwd = fund_module.CWD
+            try:
+                singleton_module.Singleton._instances = {}
+                fund_module.CWD = tmp_dir
+
+                df_mock = pd.DataFrame({"基金代码": ["000001"], "基金简称": ["中证红利"]})
+                with patch.object(fund_module.ak, "fund_name_em", return_value=df_mock):
+                    helper = FundNameCodeHelper()
+
+                csv_path = os.path.join(tmp_dir, "export_fund.csv")
+                helper.export_to_csv(csv_path)
+
+                self.assertTrue(os.path.exists(csv_path))
+                df_out = pd.read_csv(csv_path)
+                self.assertEqual(len(df_out), 1)
+                self.assertEqual(str(df_out.iloc[0]['code']).zfill(6), "000001")
+                self.assertEqual(df_out.iloc[0]['name'], "中证红利")
+            finally:
+                fund_module.CWD = original_cwd
+                singleton_module.Singleton._instances = original_instances
+
     def test_get_fund_code_and_name(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             original_instances = singleton_module.Singleton._instances

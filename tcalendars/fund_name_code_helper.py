@@ -71,6 +71,13 @@ class FundNameCodeHelper(metaclass=Singleton):
             res = None
         return res
 
+    def export_to_csv(self, file_path: str):
+        '''
+        导出基金名称代码表到CSV文件
+        '''
+        if not self._fund_name_code.empty:
+            self._fund_name_code.to_csv(file_path, index=False, encoding='utf-8')
+
     @staticmethod
     def clean_name(name: str) -> str:
         '''
