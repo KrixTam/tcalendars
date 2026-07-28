@@ -34,6 +34,18 @@ class DatabaseManager:
                     jyrq TEXT PRIMARY KEY
                 )
             ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS stock_name_code (
+                    code TEXT PRIMARY KEY,
+                    name TEXT,
+                    market TEXT,
+                    pinyin TEXT
+                )
+            ''')
+            cursor.execute("PRAGMA table_info(stock_name_code)")
+            stock_columns = {row[1] for row in cursor.fetchall()}
+            if 'pinyin' not in stock_columns:
+                cursor.execute("ALTER TABLE stock_name_code ADD COLUMN pinyin TEXT")
             conn.commit()
 
     def get_connection(self):
