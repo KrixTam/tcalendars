@@ -47,6 +47,8 @@ class TestStockNameCodeHelper(unittest.TestCase):
             {"code": "000012", "name": "复洁科技", "market": "沪市", "pinyin": "FJKJ"},
             {"code": "000013", "name": "万兴科技", "market": "深市", "pinyin": "WXKJ"},
             {"code": "000014", "name": "同兴科技", "market": "深市", "pinyin": "TXKJ"},
+            {"code": "300246", "name": "宝莱特", "market": "深市", "pinyin": "BLT"},
+            {"code": "688333", "name": "铂力特", "market": "沪市", "pinyin": "BLT"},
         ])
         
         # 验证拼音精确匹配命中后直接返回
@@ -112,6 +114,10 @@ class TestStockNameCodeHelper(unittest.TestCase):
         res_voice_cn = helper.query('复兴科技')
         self.assertEqual(len(res_voice_cn), 1)
         self.assertEqual(res_voice_cn[0]['code'], '000011')
+
+        # 验证中文输入命中拼音精确匹配时，会优先排序同时满足单字容错的候选
+        res_ranked_py_exact = helper.query('博力特')
+        self.assertEqual([item['code'] for item in res_ranked_py_exact[:2]], ['688333', '300246'])
 
         # 验证 limit 参数
         res_limit = helper.query('DK', limit=2)

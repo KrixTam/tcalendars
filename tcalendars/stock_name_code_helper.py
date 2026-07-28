@@ -60,7 +60,6 @@ PINYIN_CONFUSION_GROUPS = (
     ("N", "L"),
     ("F", "H"),
     ("R", "L"),
-    ("N", "L"),
     ("S", "Z"),
 )
 
@@ -302,6 +301,32 @@ class StockNameCodeHelper(metaclass=Singleton):
                     variants.append((index, pinyin_text[:index] + alt + pinyin_text[index + 1:]))
             return variants
 
+        def _build_pinyin_exact_tie_for_chinese(keyword_text: str, candidate_name: str, code: str) -> tuple:
+            char_distance = _char_distance(keyword_text, candidate_name)
+            is_single_char_typo = 1 if char_distance == 1 else 0
+            same_char_count = sum(lch == rch for lch, rch in zip(keyword_text, candidate_name))
+            prefix_len = _common_prefix_len(keyword_text, candidate_name)
+            suffix_len = _common_suffix_len(keyword_text, candidate_name)
+
+            if is_single_char_typo:
+                diff_index = next(i for i, (lch, rch) in enumerate(zip(keyword_text, candidate_name)) if lch != rch)
+                typo_pinyin_distance = _edit_distance(
+                    _generate_full_pinyin(keyword_text[diff_index]),
+                    _generate_full_pinyin(candidate_name[diff_index])
+                )
+            else:
+                typo_pinyin_distance = 99
+
+            return (
+                -is_single_char_typo,
+                typo_pinyin_distance,
+                -same_char_count,
+                -suffix_len,
+                -prefix_len,
+                len(candidate_name),
+                code
+            )
+
         rows = []
         for _, row in self._stock_name_code.iterrows():
             code = _as_text(row['code'])
@@ -398,9 +423,14 @@ class StockNameCodeHelper(metaclass=Singleton):
                     return _finalize_candidates(strong_typo_candidates)
 
                 candidates = []
-                for row, code, _, py in rows:
+                for row, code, name, py in rows:
                     if converted_pinyin == py:
-                        _append_candidate(candidates, row, 0, (len(py), code))
+                        _append_candidate(
+                            candidates,
+                            row,
+                            0,
+                            _build_pinyin_exact_tie_for_chinese(keyword_str, name, code)
+                        )
                 if candidates:
                     return _finalize_candidates(candidates)
 
